@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>フラッシュ暗算</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #2a2a3a;
+      --accent: #00e5ff;
+      --accent2: #ff4d6d;
+      --text: #e8e8f0;
+      --muted: #6060a0;
+      --correct: #00e5a0;
+      --wrong: #ff4d6d;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.3;
+      z-index: 0;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: min(480px, 92vw);
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .header h1 {
+      font-family: 'Zen Antique Soft', serif;
+      font-size: clamp(1.8rem, 6vw, 2.8rem);
+      letter-spacing: 0.2em;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      margin-top: 0.3rem;
+    }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.05);
+    }
+
+    /* ===== SETTINGS SCREEN ===== */
+    .settings { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .val {
+      min-width: 2.5rem;
+      text-align: center;
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+
+    /* Speed selector */
+    .speed-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+    .speed-btn {
+      padding: 0.5rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .speed-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,229,255,0.07);
+      box-shadow: 0 0 8px rgba(0,229,255,0.2);
+    }
+    .speed-btn:hover:not(.active) { border-color: var(--muted); color: var(--text); }
+
+    /* Start button */
+    .btn-start {
+      width: 100%;
+      padding: 0.9rem;
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: var(--accent);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-start::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn-start:hover::after { opacity: 0.1; }
+    .btn-start:active { transform: scale(0.98); }
+
+    /* ===== GAME SCREEN ===== */
+    #game-screen { display: none; }
+
+    .progress-bar-wrap {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+
+    .number-display {
+      text-align: center;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flash-number {
+      font-family: 'Zen Antique Soft', serif;
+      font-size: clamp(4rem, 20vw, 6rem);
+      color: var(--text);
+      line-height: 1;
+      transition: opacity 0.08s;
+      text-shadow: 0 0 30px rgba(0,229,255,0.3);
+    }
+
+    .flash-number.hidden { opacity: 0; }
+    .flash-number.flash-in { animation: flashIn 0.1s ease; }
+
+    @keyframes flashIn {
+      0% { transform: scale(1.15); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .count-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      margin-top: 0.5rem;
+    }
+
+    /* ===== ANSWER SCREEN ===== */
+    #answer-screen { display: none; }
+
+    .answer-section { text-align: center; }
+    .answer-prompt {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .answer-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid var(--accent);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(2rem, 10vw, 3rem);
+      text-align: center;
+      outline: none;
+      padding: 0.3rem 0;
+      caret-color: var(--accent);
+    }
+
+    .btn-submit {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: var(--bg);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.15s;
+    }
+    .btn-submit:hover { filter: brightness(1.1); }
+    .btn-submit:active { transform: scale(0.98); }
+
+    /* ===== RESULT SCREEN ===== */
+    #result-screen { display: none; }
+
+    .result-icon {
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn {
+      from { transform: scale(0); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .result-label {
+      text-align: center;
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .result-value {
+      text-align: center;
+      font-family: 'Zen Antique Soft', serif;
+      font-size: clamp(2.5rem, 12vw, 4rem);
+      margin-bottom: 0.5rem;
+    }
+    .result-value.correct { color: var(--correct); text-shadow: 0 0 20px var(--correct); }
+    .result-value.wrong { color: var(--wrong); text-shadow: 0 0 20px var(--wrong); }
+
+    .answer-compare {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.2rem 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      text-align: center;
+    }
+    .compare-item span:first-child {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      display: block;
+      text-transform: uppercase;
+    }
+    .compare-item span:last-child { font-size: 1.3rem; }
+    .compare-item .correct-answer { color: var(--correct); }
+    .compare-item .user-answer.wrong-answer { color: var(--wrong); }
+
+    .history {
+      margin: 1rem 0;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .btn-retry {
+      width: 100%;
+      padding: 0.9rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: all 0.15s;
+    }
+    .btn-retry:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Streak badge */
+    .streak { font-size: 0.75rem; color: var(--accent2); text-align: center; margin-top: 0.5rem; }
+
+    /* Screen transitions */
+    .screen { animation: fadeUp 0.25s ease; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>フラッシュ暗算</h1>
+    <p>FLASH MENTAL ARITHMETIC</p>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="card screen" id="settings-screen">
+    <div class="settings">
+
+      <div class="field">
+        <label>桁数 (DIGITS)</label>
+        <div class="slider-row">
+          <input type="range" id="digits" min="1" max="4" value="1" />
+          <span class="val" id="digits-val">1</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>問題数 (COUNT)</label>
+        <div class="slider-row">
+          <input type="range" id="count" min="3" max="15" value="5" />
+          <span class="val" id="count-val">5</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>表示速度 (SPEED)</label>
+        <div class="speed-grid">
+          <button class="speed-btn" data-ms="2000">ゆっくり<br>2.0s</button>
+          <button class="speed-btn active" data-ms="1000">ふつう<br>1.0s</button>
+          <button class="speed-btn" data-ms="500">はやい<br>0.5s</button>
+        </div>
+      </div>
+
+      <button class="btn-start" id="btn-start">▶ スタート</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div class="card screen" id="game-screen">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div class="number-display">
+      <div class="flash-number hidden" id="flash-number">0</div>
+      <div class="count-label" id="count-label">0 / 0</div>
+    </div>
+  </div>
+
+  <!-- ANSWER -->
+  <div class="card screen" id="answer-screen">
+    <div class="answer-section">
+      <p class="answer-prompt">答えを入力してください</p>
+      <input type="number" id="answer-input" class="answer-input" placeholder="?" inputmode="numeric" />
+      <button class="btn-submit" id="btn-submit">決定</button>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="card screen" id="result-screen">
+    <div id="result-icon" class="result-icon"></div>
+    <p class="result-label">あなたの答え</p>
+    <div id="result-value" class="result-value"></div>
+    <div class="answer-compare" id="answer-compare">
+      <div class="compare-item">
+        <span>正解</span>
+        <span id="correct-val" class="correct-answer"></span>
+      </div>
+      <div class="compare-item">
+        <span>あなた</span>
+        <span id="user-val"></span>
+      </div>
+    </div>
+    <div class="history" id="history-display"></div>
+    <div class="streak" id="streak-display"></div>
+    <button class="btn-retry" id="btn-retry-same">↺ もう一度 (同じ設定)</button>
+    <button class="btn-retry" id="btn-settings" style="margin-top:0.4rem">⚙ 設定に戻る</button>
+  </div>
+</div>
+
+<script>
+  // ===== STATE =====
+  let digits = 1, count = 5, speedMs = 1000;
+  let numbers = [], currentIdx = 0, correctAnswer = 0;
+  let streak = 0;
+
+  // ===== SETTINGS =====
+  const digitsSlider = document.getElementById('digits');
+  const countSlider  = document.getElementById('count');
+  const digitsVal    = document.getElementById('digits-val');
+  const countVal     = document.getElementById('count-val');
+
+  digitsSlider.addEventListener('input', () => { digits = +digitsSlider.value; digitsVal.textContent = digits; });
+  countSlider.addEventListener('input',  () => { count  = +countSlider.value;  countVal.textContent  = count;  });
+
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      speedMs = +btn.dataset.ms;
+    });
+  });
+
+  document.getElementById('btn-start').addEventListener('click', startGame);
+
+  // ===== GAME =====
+  function randNum(d) {
+    const min = Math.pow(10, d - 1);
+    const max = Math.pow(10, d) - 1;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function startGame() {
+    numbers = Array.from({ length: count }, () => randNum(digits));
+    correctAnswer = numbers.reduce((a, b) => a + b, 0);
+    currentIdx = 0;
+
+    show('game-screen');
+    updateProgress();
+    showNextNumber();
+  }
+
+  function showNextNumber() {
+    const el = document.getElementById('flash-number');
+    const label = document.getElementById('count-label');
+
+    if (currentIdx >= numbers.length) {
+      show('answer-screen');
+      const input = document.getElementById('answer-input');
+      input.value = '';
+      setTimeout(() => input.focus(), 100);
+      return;
+    }
+
+    el.textContent = numbers[currentIdx];
+    el.classList.remove('hidden', 'flash-in');
+    void el.offsetWidth; // reflow
+    el.classList.add('flash-in');
+    label.textContent = `${currentIdx + 1} / ${numbers.length}`;
+
+    currentIdx++;
+    updateProgress();
+
+    setTimeout(() => {
+      el.classList.add('hidden');
+      setTimeout(showNextNumber, 80);
+    }, speedMs - 80);
+  }
+
+  function updateProgress() {
+    const pct = (currentIdx / numbers.length) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+  }
+
+  // ===== ANSWER =====
+  document.getElementById('btn-submit').addEventListener('click', checkAnswer);
+  document.getElementById('answer-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkAnswer();
+  });
+
+  function checkAnswer() {
+    const input = document.getElementById('answer-input');
+    const userAnswer = parseInt(input.value, 10);
+    if (isNaN(userAnswer)) { input.focus(); return; }
+
+    const isCorrect = userAnswer === correctAnswer;
+    streak = isCorrect ? streak + 1 : 0;
+    showResult(isCorrect, userAnswer);
+  }
+
+  function showResult(isCorrect, userAnswer) {
+    document.getElementById('result-icon').textContent = isCorrect ? '🎉' : '😢';
+    const rv = document.getElementById('result-value');
+    rv.textContent = isCorrect ? '正解！' : '不正解';
+    rv.className = 'result-value ' + (isCorrect ? 'correct' : 'wrong');
+
+    document.getElementById('correct-val').textContent = correctAnswer;
+    const uv = document.getElementById('user-val');
+    uv.textContent = userAnswer;
+    uv.className = isCorrect ? 'user-answer' : 'user-answer wrong-answer';
+
+    // Show numbers used
+    document.getElementById('history-display').textContent =
+      '数列: ' + numbers.join('  +  ') + '  =  ' + correctAnswer;
+
+    const sd = document.getElementById('streak-display');
+    sd.textContent = streak >= 2 ? `🔥 ${streak} 連続正解！` : '';
+
+    show('result-screen');
+  }
+
+  // ===== RETRY =====
+  document.getElementById('btn-retry-same').addEventListener('click', startGame);
+  document.getElementById('btn-settings').addEventListener('click', () => show('settings-screen'));
+
+  // ===== SCREEN SWITCHING =====
+  function show(id) {
+    ['settings-screen','game-screen','answer-screen','result-screen'].forEach(s => {
+      const el = document.getElementById(s);
+      el.style.display = 'none';
+      el.classList.remove('screen');
+    });
+    const target = document.getElementById(id);
+    target.style.display = 'block';
+    void target.offsetWidth;
+    target.classList.add('screen');
+  }
+</script>
+</body>
+</html>
